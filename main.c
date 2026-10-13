@@ -1,5 +1,6 @@
 #include "raylib.h"
 #include <math.h>
+#include <stdlib.h>
 
 //----------------------------------------------------------------------------------
 // Some Defines
@@ -7,6 +8,7 @@
 #define PLAYER_MAX_LIFE         5
 #define MAX_PLATFORMS           20
 #define GRAVITY                 1000.0f
+#define FRICTION                500.0f
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -28,6 +30,7 @@ typedef struct Player
     Color color;
 
     float move_speed;
+    float max_velocity;
     float jump_power;
 
     int life;
@@ -77,6 +80,7 @@ static void jump();
 static void player_move(float dt);
 static bool is_on_ground(const Object *object);
 static bool has_landed(Object *object);
+static float clamp(float, float min, float max);
 
 static void AddPlatform(float x, float y, float width, float height,Color color);
 
@@ -108,11 +112,14 @@ static void InitGame(void)
     AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK);
     AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK);
 
+    AddPlatform(500,ground_y-platform_width,platform_height,platform_width,BLACK);
+
     player.object.position = (Vector2){20,0};
     player.object.size = (Vector2){10,10};
     player.life = PLAYER_MAX_LIFE;
-    player.move_speed = 300.0f;
+    player.move_speed = 1000.0f;
     player.jump_power = 500.0f;
+    player.max_velocity = 500.0f;
 
 }
 
@@ -177,9 +184,25 @@ static void player_move(float dt)
     }
     //walking stuff
     if(IsKeyDown(KEY_A))
-        player.object.position.x -= player.move_speed * dt;
+        player.object.velocity.x -= player.move_speed * dt;
+
     if(IsKeyDown(KEY_D))
-        player.object.position.x += player.move_speed * dt;
+        player.object.velocity.x += player.move_speed * dt;
+
+    if(fabs(player.object.velocity.x)>FRICTION * dt)
+    {
+        if(player.object.velocity.x < 0)
+            player.object.velocity.x += FRICTION * dt;
+        else if(player.object.velocity.x > 0)
+            player.object.velocity.x -= FRICTION * dt;
+    }
+    else
+    {
+        player.object.velocity.x = 0;
+    }
+    
+    player.object.velocity.x = clamp(player.object.velocity.x,player.max_velocity*-1,player.max_velocity);
+    player.object.position.x += player.object.velocity.x * dt;
 
 }
 
@@ -221,4 +244,11 @@ static bool has_landed(Object *object)
         }
     }
     return false;
+}
+
+static float clamp(float move_speed, float min_vel, float max_vel)
+{
+    if (move_speed<min_vel) return min_vel;
+    if (move_speed>max_vel) return max_vel;
+    return move_speed;
 }
