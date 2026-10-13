@@ -8,7 +8,6 @@
 #define PLAYER_MAX_LIFE         5
 #define MAX_PLATFORMS           20
 #define GRAVITY                 1000.0f
-#define FRICTION                500.0f
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -20,6 +19,8 @@ typedef struct Object
     Vector2 size;
     Vector2 velocity;
 
+    float friction;
+
     bool on_ground;
 }Object;
 
@@ -29,8 +30,10 @@ typedef struct Player
 
     Color color;
 
+    float default_max_vel;
     float move_speed;
     float max_velocity;
+    float air_max_vel;
     float jump_power;
 
     int life;
@@ -44,6 +47,9 @@ typedef struct Platform
     Vector2 size;
 
     Color color;
+
+    float friction;
+    float coef_max_vel;
 
 } Platform;
 
@@ -61,6 +67,7 @@ static Player player = {0};
 
 static Platform platforms[MAX_PLATFORMS];
 static int platform_count = 0;
+static float platform_main_friction = 2000.0f;
 
 static float ground_y = 420;
 static float platform_width = 100;
@@ -78,11 +85,12 @@ static void UpdateDrawFrame(void);  // Update and Draw (one frame)
 
 static void jump();
 static void player_move(float dt);
-static bool is_on_ground(const Object *object);
-static bool has_landed(Object *object);
+static int on_which_ground(const Object *object);
+static int has_landed_on(Object *object);
+static int touching_which_platform(const Object *object);
 static float clamp(float, float min, float max);
 
-static void AddPlatform(float x, float y, float width, float height,Color color);
+static void AddPlatform(float x, float y, float width, float height,Color color, float friction, float coef_max_vel);
 
 int main()
 {
@@ -106,24 +114,27 @@ static void InitGame(void)
     //PLATFORM DRAWING
 
     //LEVEL PLATFORMS
-    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y, platform_width,platform_height,BLACK);
-    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK);
-    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK);
-    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK);
-    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK);
+    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y, platform_width,platform_height,BLACK,platform_main_friction,1.0f);
+    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,GREEN,platform_main_friction,1.5f);
+    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
+    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
+    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
 
-    AddPlatform(500,ground_y-platform_width,platform_height,platform_width,BLACK);
+    AddPlatform(500,ground_y-platform_width,platform_height,platform_width,BLACK,platform_main_friction,1.0f);
 
+    //player setup
     player.object.position = (Vector2){20,0};
     player.object.size = (Vector2){10,10};
     player.life = PLAYER_MAX_LIFE;
-    player.move_speed = 1000.0f;
-    player.jump_power = 500.0f;
-    player.max_velocity = 500.0f;
+    player.move_speed = 2500.0f;
+    player.jump_power = 350.0f;
+    player.default_max_vel = 250.0f;
+    player.max_velocity = player.default_max_vel;
+    player.object.friction = player.move_speed /2;
 
 }
 
-static void AddPlatform(float x, float y, float width, float height, Color color)
+static void AddPlatform(float x, float y, float width, float height, Color color, float friction,float coef_max_vel)
 {
     if (platform_count<MAX_PLATFORMS)
     {
@@ -131,7 +142,9 @@ static void AddPlatform(float x, float y, float width, float height, Color color
         {
             .position = {x,y},
             .size = {width,height},
-            .color = color
+            .color = color,
+            .friction = friction,
+            .coef_max_vel = coef_max_vel
         };
     }
 
@@ -170,17 +183,32 @@ static void UpdateDrawFrame(void)
 static void player_move(float dt)
 {
     //Jump stuff
+    int ground_platform, landed_on, touching_platform;
     player.object.prev_position.y = player.object.position.y;
+    player.object.prev_position.x = player.object.position.x;
     if(IsKeyPressed(KEY_SPACE))
         jump();
     if (IsKeyReleased(KEY_SPACE) && player.object.velocity.y < 0)
         player.object.velocity.y *= 0.5f;
     //gravity stuff
-    if (!(player.object.on_ground = is_on_ground(&player.object)))
+    if ((ground_platform = on_which_ground(&player.object)) == -1)//on air
     {
+        player.object.on_ground = false;
         player.object.velocity.y+=GRAVITY*dt;
         player.object.position.y += player.object.velocity.y * dt;
-        has_landed(&player.object);
+        player.object.friction = player.move_speed *0.2f;
+        player.max_velocity = player.air_max_vel;
+        if((landed_on = has_landed_on(&player.object)) > -1)
+        {
+            player.object.on_ground = true;
+        }
+        
+    }
+    else{ //on ground
+        player.object.friction = platforms[ground_platform].friction;
+        player.max_velocity = player.default_max_vel*platforms[ground_platform].coef_max_vel;
+        player.air_max_vel = player.max_velocity *1.05f;
+        player.object.on_ground = true;
     }
     //walking stuff
     if(IsKeyDown(KEY_A))
@@ -189,21 +217,21 @@ static void player_move(float dt)
     if(IsKeyDown(KEY_D))
         player.object.velocity.x += player.move_speed * dt;
 
-    if(fabs(player.object.velocity.x)>FRICTION * dt)
+    if(fabs(player.object.velocity.x)>player.object.friction * dt)
     {
         if(player.object.velocity.x < 0)
-            player.object.velocity.x += FRICTION * dt;
+            player.object.velocity.x += player.object.friction * dt;
         else if(player.object.velocity.x > 0)
-            player.object.velocity.x -= FRICTION * dt;
+            player.object.velocity.x -= player.object.friction * dt;
     }
     else
     {
         player.object.velocity.x = 0;
     }
-    
+
     player.object.velocity.x = clamp(player.object.velocity.x,player.max_velocity*-1,player.max_velocity);
     player.object.position.x += player.object.velocity.x * dt;
-
+    
 }
 
 static void jump()
@@ -216,18 +244,19 @@ static void jump()
 
 }
 
-static bool is_on_ground(const Object *object)
+static int on_which_ground(const Object *object)
 {
     for(int i = 0;i<platform_count;i++)
     {
-        if(object->velocity.y >= 0 && fabsf(object->position.y + object->size.y - platforms[i].position.y) < 0.1f&&
+        if(object->velocity.y >= 0 && 
+            fabsf(object->position.y + object->size.y - platforms[i].position.y) < 0.1f&&
             object->position.x+object->size.x > platforms[i].position.x &&
             object->position.x<platforms[i].position.x + platforms[i].size.x)
-            return true;
+            return i;
     }
-    return false;
+    return -1;
 }
-static bool has_landed(Object *object)
+static int has_landed_on(Object *object)
 {
     for(int i = 0;i<platform_count;i++)
     {
@@ -235,15 +264,41 @@ static bool has_landed(Object *object)
             object->position.x+object->size.x > platforms[i].position.x &&
             object->position.x<platforms[i].position.x + platforms[i].size.x)
         {
-            if(object->prev_position.y+object->size.y<platforms[i].position.y && object->position.y+object->size.y>=platforms[i].position.y)
+            if(object->prev_position.y+object->size.y<platforms[i].position.y && 
+                object->position.y+object->size.y>=platforms[i].position.y)
             {
                 object->position.y = platforms[i].position.y - object->size.y;
                 object->velocity.y = 0;
-                return true;
+                return i;
             }
         }
     }
-    return false;
+    return -1;
+}
+
+static int touching_which_platform(const Object *object)
+{
+    float object_up, object_bottom, object_right, object_left, platform_up, platform_bottom, platform_left, platform_right;
+    for (int i = 0; i<platform_count;i++)
+    {
+        object_up = object->position.y;
+        object_bottom = object->position.y + object->size.y;
+        object_left = object->position.x;
+        object_right = object->position.x + object->size.x;
+
+        platform_up = platforms[i].position.y;
+        platform_bottom = platforms[i].position.y + platforms[i].size.y;
+        platform_left = platforms[i].position.x;
+        platform_right = platforms[i].position.x + platforms[i].size.x;
+
+        if((fabsf(object_right - platform_left) <= 0.01f && object_bottom >= platform_up && object_up <= platform_bottom) ||
+        (fabsf(platform_right - object_left) <=0.01f && object_bottom >= platform_up && object_up <= platform_bottom))
+        {
+            return i;
+        }
+
+    }
+    return -1;
 }
 
 static float clamp(float move_speed, float min_vel, float max_vel)
