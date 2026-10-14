@@ -87,7 +87,7 @@ static void jump();
 static void player_move(float dt);
 static int on_which_ground(const Object *object);
 static int has_landed_on(Object *object);
-static int touching_which_platform(const Object *object);
+static int touching_which_platform(Object *object);
 static float clamp(float, float min, float max);
 
 static void AddPlatform(float x, float y, float width, float height,Color color, float friction, float coef_max_vel);
@@ -228,9 +228,15 @@ static void player_move(float dt)
     {
         player.object.velocity.x = 0;
     }
-
     player.object.velocity.x = clamp(player.object.velocity.x,player.max_velocity*-1,player.max_velocity);
     player.object.position.x += player.object.velocity.x * dt;
+
+    //checks obstacles for walking
+    touching_platform = touching_which_platform(&player.object);
+
+    
+
+    
     
 }
 
@@ -276,9 +282,9 @@ static int has_landed_on(Object *object)
     return -1;
 }
 
-static int touching_which_platform(const Object *object)
+static int touching_which_platform(Object *object)
 {
-    float object_up, object_bottom, object_right, object_left, platform_up, platform_bottom, platform_left, platform_right;
+    float object_up, object_bottom, object_right, object_left, platform_up, platform_bottom, platform_left, platform_right,prev_up, prev_bottom, prev_left, prev_right;
     for (int i = 0; i<platform_count;i++)
     {
         object_up = object->position.y;
@@ -286,17 +292,32 @@ static int touching_which_platform(const Object *object)
         object_left = object->position.x;
         object_right = object->position.x + object->size.x;
 
+        prev_bottom = object->prev_position.y + object->size.y;
+        prev_up = object->prev_position.y;
+        prev_left = object->prev_position.x;
+        prev_right = object->prev_position.x + object->size.x; 
+
         platform_up = platforms[i].position.y;
         platform_bottom = platforms[i].position.y + platforms[i].size.y;
         platform_left = platforms[i].position.x;
         platform_right = platforms[i].position.x + platforms[i].size.x;
 
-        if((fabsf(object_right - platform_left) <= 0.01f && object_bottom >= platform_up && object_up <= platform_bottom) ||
-        (fabsf(platform_right - object_left) <=0.01f && object_bottom >= platform_up && object_up <= platform_bottom))
+        if ((object_right >= platform_left && object_left <= platform_left && object_bottom >= platform_up && object_up <= platform_bottom)||
+            (object_left <= platform_right && object_right >= platform_right && object_bottom >= platform_up && object_up <= platform_bottom))
         {
-            return i;
+            if (prev_left >= platform_right && object->velocity.x < 0)
+            {
+                object->position.x = platform_right;
+                object->velocity.x = 0;
+                return i;
+            }
+            else if(prev_right <= platform_left && object->velocity.x > 0)
+            {
+                object->position.x = platform_left - object->size.x;
+                object->velocity.x = 0;
+                return i;
+            }
         }
-
     }
     return -1;
 }
