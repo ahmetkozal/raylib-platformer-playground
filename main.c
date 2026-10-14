@@ -7,6 +7,7 @@
 //----------------------------------------------------------------------------------
 #define PLAYER_MAX_LIFE         5
 #define MAX_PLATFORMS           20
+#define MAX_ENEMIES             20
 #define GRAVITY                 1000.0f
 
 //----------------------------------------------------------------------------------
@@ -40,6 +41,16 @@ typedef struct Player
 
 } Player;
 
+typedef struct Enemy
+{
+    float move_speed;
+    int direction;
+
+    Object object;
+
+    Color color;
+}Enemy;
+
 typedef struct Platform
 {
 
@@ -64,6 +75,8 @@ static bool game_over = false;
 
 static Player player = {0};
 
+static Enemy enemies[MAX_ENEMIES];
+static int enemy_count = 0;
 
 static Platform platforms[MAX_PLATFORMS];
 static int platform_count = 0;
@@ -72,7 +85,6 @@ static float platform_main_friction = 2000.0f;
 static float ground_y = 420;
 static float platform_width = 100;
 static float platform_height = 20;
-static float gap = 50;
 
 //------------------------------------------------------------------------------------
 // Module Functions Declaration (local)
@@ -91,6 +103,8 @@ static int touching_which_platform(Object *object);
 static float clamp(float, float min, float max);
 
 static void AddPlatform(float x, float y, float width, float height,Color color, float friction, float coef_max_vel);
+static void AddEnemy(float x, float y, float width, float height, Color color);
+static void enemy_move(float dt);
 
 int main()
 {
@@ -114,23 +128,32 @@ static void InitGame(void)
     //PLATFORM DRAWING
 
     //LEVEL PLATFORMS
-    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y, platform_width,platform_height,BLACK,platform_main_friction,1.0f);
-    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,GREEN,platform_main_friction,1.5f);
-    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
-    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
-    AddPlatform(platform_count*platform_width+platform_count * gap,ground_y,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
+    AddPlatform(0,screenHeight-platform_height,screenWidth,platform_height,YELLOW,platform_main_friction,1.0f);
+    AddPlatform(0,0,platform_height,screenWidth,YELLOW,platform_main_friction,1.0f);
+    AddPlatform(screenWidth-platform_height,0,platform_height,screenWidth,YELLOW,platform_main_friction,1.0f);
 
-    AddPlatform(500,ground_y-platform_width,platform_height,platform_width,BLACK,platform_main_friction,1.0f);
+    //AddPlatform(80,380,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
+     AddPlatform(80+60*0+(platform_width*0),360,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
+    AddPlatform(80+60*1+(platform_width*1),320,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
+    AddPlatform(80+60*2+(platform_width*2),300,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
+    AddPlatform(80+60*3+(platform_width*3),320,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
 
     //player setup
     player.object.position = (Vector2){20,0};
-    player.object.size = (Vector2){10,10};
+    player.object.size = (Vector2){20,20};
     player.life = PLAYER_MAX_LIFE;
     player.move_speed = 2500.0f;
-    player.jump_power = 350.0f;
+    player.jump_power = 400.0f;
     player.default_max_vel = 250.0f;
     player.max_velocity = player.default_max_vel;
     player.object.friction = player.move_speed /2;
+
+    //enemies setup
+    float enemy_size = 30;
+
+    AddEnemy(80,screenHeight-platform_height-enemy_size,enemy_size,enemy_size,PURPLE);
+    enemies[0].direction = 1;
+    enemies[0].move_speed = 300.0f;
 
 }
 
@@ -147,7 +170,19 @@ static void AddPlatform(float x, float y, float width, float height, Color color
             .coef_max_vel = coef_max_vel
         };
     }
+}
 
+static void AddEnemy(float x, float y, float width, float height, Color color)
+{
+    if(enemy_count<MAX_ENEMIES)
+    {
+        enemies[enemy_count++] = (Enemy)
+        {
+            .object.position = {x,y},
+            .object.size = {width,height},
+            .color = color
+        };
+    }
 }
 
 static void DrawGame(void)
@@ -158,6 +193,11 @@ static void DrawGame(void)
         {
             DrawRectangleV(platforms[i].position,platforms[i].size,platforms[i].color);
         }
+        for(int i = 0; i < enemy_count; i++)
+        {
+            DrawRectangleV(enemies[i].object.position,enemies[i].object.size,enemies[i].color);
+        }
+
         DrawRectangleV(player.object.position,player.object.size,RED);
     EndDrawing();
 
@@ -170,6 +210,7 @@ static void UpdateGame(void)
     if(!game_over)
     {
         player_move(dt);
+        enemy_move(dt);
     }
 }
 
@@ -178,6 +219,23 @@ static void UpdateDrawFrame(void)
 {
     UpdateGame();
     DrawGame();
+}
+
+static void enemy_move(float dt)
+{
+    for(int i = 0; i < enemy_count; i++)
+    {
+        Enemy *enemy = &enemies[i];
+        enemy->object.prev_position = enemy->object.position;
+
+        enemy->object.velocity.x = enemy->move_speed * enemy->direction;
+        enemy->object.position.x += enemy->object.velocity.x *dt;
+
+        if (touching_which_platform(&enemy->object) > -1)
+        {
+            enemy->direction *= -1;
+        }
+    }
 }
 
 static void player_move(float dt)
@@ -302,8 +360,8 @@ static int touching_which_platform(Object *object)
         platform_left = platforms[i].position.x;
         platform_right = platforms[i].position.x + platforms[i].size.x;
 
-        if ((object_right >= platform_left && object_left <= platform_left && object_bottom >= platform_up && object_up <= platform_bottom)||
-            (object_left <= platform_right && object_right >= platform_right && object_bottom >= platform_up && object_up <= platform_bottom))
+        if ((object_right >= platform_left && object_left <= platform_left && object_bottom > platform_up && object_up < platform_bottom)||
+            (object_left <= platform_right && object_right >= platform_right && object_bottom > platform_up && object_up < platform_bottom))
         {
             if (prev_left >= platform_right && object->velocity.x < 0)
             {
