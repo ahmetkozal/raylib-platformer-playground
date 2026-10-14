@@ -5,7 +5,7 @@
 //----------------------------------------------------------------------------------
 // Some Defines
 //----------------------------------------------------------------------------------
-#define PLAYER_MAX_LIFE         3
+#define PLAYER_MAX_LIFE         4
 #define MAX_PLATFORMS           20
 #define MAX_ENEMIES             20
 #define GRAVITY                 1000.0f
@@ -203,6 +203,12 @@ static void DrawGame(void)
         }
         
         DrawRectangleV(player.object.position,player.object.size,RED);
+        
+        for(int i = 0; i<player.life;i++)
+        {
+            DrawCircle(20+i*20,20,10,GREEN);
+        }         
+
     EndDrawing();
 
 }
