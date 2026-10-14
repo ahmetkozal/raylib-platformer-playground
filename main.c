@@ -5,7 +5,7 @@
 //----------------------------------------------------------------------------------
 // Some Defines
 //----------------------------------------------------------------------------------
-#define PLAYER_MAX_LIFE         5
+#define PLAYER_MAX_LIFE         3
 #define MAX_PLATFORMS           20
 #define MAX_ENEMIES             20
 #define GRAVITY                 1000.0f
@@ -80,7 +80,7 @@ static int enemy_count = 0;
 
 static Platform platforms[MAX_PLATFORMS];
 static int platform_count = 0;
-static float platform_main_friction = 2000.0f;
+static float platform_main_friction = 3000.0f;
 
 static float ground_y = 420;
 static float platform_width = 100;
@@ -133,7 +133,7 @@ static void InitGame(void)
     AddPlatform(screenWidth-platform_height,0,platform_height,screenWidth,YELLOW,platform_main_friction,1.0f);
 
     //AddPlatform(80,380,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
-     AddPlatform(80+60*0+(platform_width*0),360,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
+    AddPlatform(80+60*0+(platform_width*0),360,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
     AddPlatform(80+60*1+(platform_width*1),320,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
     AddPlatform(80+60*2+(platform_width*2),300,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
     AddPlatform(80+60*3+(platform_width*3),320,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
@@ -142,7 +142,7 @@ static void InitGame(void)
     player.object.position = (Vector2){20,0};
     player.object.size = (Vector2){20,20};
     player.life = PLAYER_MAX_LIFE;
-    player.move_speed = 2500.0f;
+    player.move_speed = 8000.0f;
     player.jump_power = 400.0f;
     player.default_max_vel = 250.0f;
     player.max_velocity = player.default_max_vel;
@@ -154,6 +154,10 @@ static void InitGame(void)
     AddEnemy(80,screenHeight-platform_height-enemy_size,enemy_size,enemy_size,PURPLE);
     enemies[0].direction = 1;
     enemies[0].move_speed = 300.0f;
+
+    AddEnemy(80,screenHeight-platform_height-enemy_size,enemy_size,enemy_size,BROWN);
+    enemies[1].direction = 1;
+    enemies[1].move_speed = 350.0f;
 
 }
 
@@ -197,7 +201,7 @@ static void DrawGame(void)
         {
             DrawRectangleV(enemies[i].object.position,enemies[i].object.size,enemies[i].color);
         }
-
+        
         DrawRectangleV(player.object.position,player.object.size,RED);
     EndDrawing();
 
