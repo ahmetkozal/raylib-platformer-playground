@@ -21,6 +21,7 @@ typedef struct Object
     Vector2 velocity;
 
     float friction;
+    float damage_timer;
 
     int life;
 
@@ -127,6 +128,9 @@ int main()
 
 static void InitGame(void)
 {
+    platform_count = 0;
+    enemy_count = 0;
+    
     //PLATFORM DRAWING
 
     //LEVEL PLATFORMS
@@ -150,6 +154,7 @@ static void InitGame(void)
     player.max_velocity = player.default_max_vel;
     player.object.friction = player.move_speed /2;
     player.object.can_get_damage = true;
+    player.object.damage_timer = 0.0f;
 
     //enemies setup
     float enemy_size = 30;
@@ -210,7 +215,12 @@ static void DrawGame(void)
         for(int i = 0; i<player.object.life;i++)
         {
             DrawCircle(20+i*20,20,10,GREEN);
-        }         
+        }
+        if(game_over)
+        {
+            DrawText("GAME OVER!",screenWidth/2,screenHeight/2,40,RED);
+        }
+        
 
     EndDrawing();
 
@@ -223,7 +233,28 @@ static void UpdateGame(void)
     if(!game_over)
     {
         player_move(dt);
+        if(player.object.damage_timer>0)
+            player.object.damage_timer-=dt;
+        if(player.object.damage_timer <= 0)
+        {
+            player.object.can_get_damage = true;
+        }
+        if(player.object.life <= 0)
+        {
+            game_over = true;
+            
+        }
         enemy_move(dt);
+    }
+    else
+    {
+        
+        if(IsKeyPressed(KEY_SPACE))
+        {
+            game_over = false;
+            InitGame();
+
+        }
     }
 }
 
@@ -420,12 +451,13 @@ static int check_enemy_touching(Object *object)
         enemy_right = enemy_left + enemy.object.size.x;
 
         if(right>=enemy_left && left <= enemy_left && upper<enemy_lower && lower > enemy_upper ||
-            left <= enemy_left && right >= enemy_right && upper<enemy_lower && lower > enemy_upper)
+            left <= enemy_right && right >= enemy_right && upper<enemy_lower && lower > enemy_upper)
         {
             if(object->can_get_damage)
             {
                 object->life--;
                 object->can_get_damage = false;
+                object->damage_timer = 1.0f;
             }
             return i;
         }
