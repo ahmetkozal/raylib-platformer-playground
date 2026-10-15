@@ -27,6 +27,7 @@ typedef struct Object
 
     bool can_get_damage;
     bool on_ground;
+    bool dead;
 }Object;
 
 typedef struct Player
@@ -79,6 +80,7 @@ static Player player = {0};
 
 static Enemy enemies[MAX_ENEMIES];
 static int enemy_count = 0;
+static float enemy_size = 30;
 
 static Platform platforms[MAX_PLATFORMS];
 static int platform_count = 0;
@@ -157,7 +159,7 @@ static void InitGame(void)
     player.object.damage_timer = 0.0f;
 
     //enemies setup
-    float enemy_size = 30;
+    
 
     AddEnemy(80,screenHeight-platform_height-enemy_size,enemy_size,enemy_size,PURPLE);
     enemies[0].direction = 1;
@@ -272,13 +274,22 @@ static void enemy_move(float dt)
         Enemy *enemy = &enemies[i];
         enemy->object.prev_position = enemy->object.position;
 
-        enemy->object.velocity.x = enemy->move_speed * enemy->direction;
-        enemy->object.position.x += enemy->object.velocity.x *dt;
-
-        if (touching_which_platform(&enemy->object) > -1)
+        if(!enemy->object.dead)
         {
-            enemy->direction *= -1;
+            enemy->object.velocity.x = enemy->move_speed * enemy->direction;
+            enemy->object.position.x += enemy->object.velocity.x *dt;
+
+            if (touching_which_platform(&enemy->object) > -1)
+            {
+                enemy->direction *= -1;
+            }
         }
+        else
+        {
+            enemies[i].object.size.y = enemy_size/2;
+            enemies[i].object.position.y += 100.0f * dt;
+        }
+
     }
 }
 
@@ -434,7 +445,7 @@ static float clamp(float move_speed, float min_vel, float max_vel)
 
 static int check_enemy_touching(Object *object)
 {
-    float upper,lower,left,right;
+    float upper,lower,left,right,prev_upper,prev_lower,prev_left,prev_right;
     float enemy_upper,enemy_lower,enemy_left,enemy_right;
     for(int i = 0; i<enemy_count;i++)
     {
@@ -442,6 +453,11 @@ static int check_enemy_touching(Object *object)
         lower = upper + object->size.y;
         left = object->position.x;
         right = left + object->size.x;
+
+        prev_upper = object->prev_position.y;
+        prev_lower = prev_upper + object->size.y;
+        prev_left = object->prev_position.x;
+        prev_right = prev_left + object->size.x;
 
         Enemy enemy = enemies[i];
 
@@ -452,14 +468,23 @@ static int check_enemy_touching(Object *object)
 
         if(right>=enemy_left && left <= enemy_left && upper<enemy_lower && lower > enemy_upper ||
             left <= enemy_right && right >= enemy_right && upper<enemy_lower && lower > enemy_upper)
-        {
-            if(object->can_get_damage)
+        {  
+            if(prev_lower <= enemy_upper)
             {
-                object->life--;
-                object->can_get_damage = false;
-                object->damage_timer = 1.0f;
+                object->velocity.y -= 500.0f;
+                object->position.y = enemy_upper;
+                enemies[i].object.dead = true;
             }
-            return i;
+            else{
+                if(object->can_get_damage && !enemy.object.dead)
+                {
+                    object->life--;
+                    object->can_get_damage = false;
+                    object->damage_timer = 1.0f;
+                }
+
+            }
+        return i;
         }
     }
     return -1;
