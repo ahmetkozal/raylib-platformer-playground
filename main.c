@@ -22,6 +22,9 @@ typedef struct Object
 
     float friction;
 
+    int life;
+
+    bool can_get_damage;
     bool on_ground;
 }Object;
 
@@ -36,8 +39,6 @@ typedef struct Player
     float max_velocity;
     float air_max_vel;
     float jump_power;
-
-    int life;
 
 } Player;
 
@@ -101,6 +102,7 @@ static int on_which_ground(const Object *object);
 static int has_landed_on(Object *object);
 static int touching_which_platform(Object *object);
 static float clamp(float, float min, float max);
+static int check_enemy_touching(Object *object);
 
 static void AddPlatform(float x, float y, float width, float height,Color color, float friction, float coef_max_vel);
 static void AddEnemy(float x, float y, float width, float height, Color color);
@@ -141,12 +143,13 @@ static void InitGame(void)
     //player setup
     player.object.position = (Vector2){20,0};
     player.object.size = (Vector2){20,20};
-    player.life = PLAYER_MAX_LIFE;
+    player.object.life = PLAYER_MAX_LIFE;
     player.move_speed = 8000.0f;
     player.jump_power = 400.0f;
     player.default_max_vel = 250.0f;
     player.max_velocity = player.default_max_vel;
     player.object.friction = player.move_speed /2;
+    player.object.can_get_damage = true;
 
     //enemies setup
     float enemy_size = 30;
@@ -204,7 +207,7 @@ static void DrawGame(void)
         
         DrawRectangleV(player.object.position,player.object.size,RED);
         
-        for(int i = 0; i<player.life;i++)
+        for(int i = 0; i<player.object.life;i++)
         {
             DrawCircle(20+i*20,20,10,GREEN);
         }         
@@ -301,6 +304,7 @@ static void player_move(float dt)
 
     //checks obstacles for walking
     touching_platform = touching_which_platform(&player.object);
+    check_enemy_touching(&player.object);
 
     
 
@@ -395,4 +399,36 @@ static float clamp(float move_speed, float min_vel, float max_vel)
     if (move_speed<min_vel) return min_vel;
     if (move_speed>max_vel) return max_vel;
     return move_speed;
+}
+
+static int check_enemy_touching(Object *object)
+{
+    float upper,lower,left,right;
+    float enemy_upper,enemy_lower,enemy_left,enemy_right;
+    for(int i = 0; i<enemy_count;i++)
+    {
+        upper = object->position.y;
+        lower = upper + object->size.y;
+        left = object->position.x;
+        right = left + object->size.x;
+
+        Enemy enemy = enemies[i];
+
+        enemy_upper = enemy.object.position.y;
+        enemy_lower = enemy_upper + enemy.object.size.y;
+        enemy_left = enemy.object.position.x;
+        enemy_right = enemy_left + enemy.object.size.x;
+
+        if(right>=enemy_left && left <= enemy_left && upper<enemy_lower && lower > enemy_upper ||
+            left <= enemy_left && right >= enemy_right && upper<enemy_lower && lower > enemy_upper)
+        {
+            if(object->can_get_damage)
+            {
+                object->life--;
+                object->can_get_damage = false;
+            }
+            return i;
+        }
+    }
+    return -1;
 }
