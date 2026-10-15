@@ -164,10 +164,12 @@ static void InitGame(void)
     AddEnemy(80,screenHeight-platform_height-enemy_size,enemy_size,enemy_size,PURPLE);
     enemies[0].direction = 1;
     enemies[0].move_speed = 300.0f;
+    enemies[0].object.dead = false;
 
     AddEnemy(80,screenHeight-platform_height-enemy_size,enemy_size,enemy_size,BROWN);
     enemies[1].direction = 1;
     enemies[1].move_speed = 350.0f;
+    enemies[1].object.dead = false;
 
 }
 
@@ -209,7 +211,8 @@ static void DrawGame(void)
         }
         for(int i = 0; i < enemy_count; i++)
         {
-            DrawRectangleV(enemies[i].object.position,enemies[i].object.size,enemies[i].color);
+            //if(enemies[i].object.position.y > screenHeight+100000)
+                DrawRectangleV(enemies[i].object.position,enemies[i].object.size,enemies[i].color);
         }
         
         DrawRectangleV(player.object.position,player.object.size,RED);
@@ -471,8 +474,10 @@ static int check_enemy_touching(Object *object)
         {  
             if(prev_lower <= enemy_upper)
             {
-                object->velocity.y -= 500.0f;
-                object->position.y = enemy_upper;
+                object->position.y = enemy_upper + object->size.y;
+                object->velocity.y = 0.0f;
+                object->velocity.y -= 300.0f;
+                
                 enemies[i].object.dead = true;
             }
             else{
