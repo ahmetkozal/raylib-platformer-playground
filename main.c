@@ -24,10 +24,12 @@ typedef struct Object
     float damage_timer;
 
     int life;
+    int direction;
 
     bool can_get_damage;
     bool on_ground;
     bool dead;
+    bool damaged;
 }Object;
 
 typedef struct Player
@@ -47,7 +49,7 @@ typedef struct Player
 typedef struct Enemy
 {
     float move_speed;
-    int direction;
+    
 
     Object object;
 
@@ -136,9 +138,9 @@ static void InitGame(void)
     //PLATFORM DRAWING
 
     //LEVEL PLATFORMS
-    AddPlatform(0,screenHeight-platform_height,screenWidth,platform_height,YELLOW,platform_main_friction,1.0f);
-    AddPlatform(0,0,platform_height,screenWidth,YELLOW,platform_main_friction,1.0f);
-    AddPlatform(screenWidth-platform_height,0,platform_height,screenWidth,YELLOW,platform_main_friction,1.0f);
+    AddPlatform(0,screenHeight-platform_height,screenWidth,platform_height,LIGHTGRAY,platform_main_friction,1.0f);
+    AddPlatform(0,0,platform_height,screenWidth,GRAY,platform_main_friction,1.0f);
+    AddPlatform(screenWidth-platform_height,0,platform_height,screenWidth,LIGHTGRAY,platform_main_friction,1.0f);
 
     //AddPlatform(80,380,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
     AddPlatform(80+60*0+(platform_width*0),360,platform_width,platform_height,BLACK,platform_main_friction,1.0f);
@@ -157,17 +159,17 @@ static void InitGame(void)
     player.object.friction = player.move_speed /2;
     player.object.can_get_damage = true;
     player.object.damage_timer = 0.0f;
-
+    player.object.direction = 1;
     //enemies setup
     
 
     AddEnemy(80,screenHeight-platform_height-enemy_size,enemy_size,enemy_size,PURPLE);
-    enemies[0].direction = 1;
+    enemies[0].object.direction = 1;
     enemies[0].move_speed = 300.0f;
     enemies[0].object.dead = false;
 
     AddEnemy(80,screenHeight-platform_height-enemy_size,enemy_size,enemy_size,BROWN);
-    enemies[1].direction = 1;
+    enemies[1].object.direction = 1;
     enemies[1].move_speed = 350.0f;
     enemies[1].object.dead = false;
 
@@ -279,12 +281,12 @@ static void enemy_move(float dt)
 
         if(!enemy->object.dead)
         {
-            enemy->object.velocity.x = enemy->move_speed * enemy->direction;
+            enemy->object.velocity.x = enemy->move_speed * enemy->object.direction;
             enemy->object.position.x += enemy->object.velocity.x *dt;
 
             if (touching_which_platform(&enemy->object) > -1)
             {
-                enemy->direction *= -1;
+                enemy->object.direction *= -1;
             }
         }
         else
@@ -344,6 +346,8 @@ static void player_move(float dt)
     {
         player.object.velocity.x = 0;
     }
+    
+    
     player.object.velocity.x = clamp(player.object.velocity.x,player.max_velocity*-1,player.max_velocity);
     player.object.position.x += player.object.velocity.x * dt;
 
@@ -472,7 +476,7 @@ static int check_enemy_touching(Object *object)
         if(right>=enemy_left && left <= enemy_left && upper<enemy_lower && lower > enemy_upper ||
             left <= enemy_right && right >= enemy_right && upper<enemy_lower && lower > enemy_upper)
         {  
-            if(prev_lower <= enemy_upper)
+            if(prev_lower <= enemy_upper && object->velocity.y > 0)
             {
                 object->position.y = enemy_upper - object->size.y;
                 object->velocity.y = 0.0f;
@@ -486,11 +490,24 @@ static int check_enemy_touching(Object *object)
                     object->life--;
                     object->can_get_damage = false;
                     object->damage_timer = 1.0f;
+                    object->velocity.x = 0;
+                    object->velocity.y = 0;
+                    object->velocity.y = -300.0f;
+                    ((left + object->size.x)/2 > (enemy_left+enemy.object.size.x)/2) ? (object->velocity.x = 2000.0f) : (object->velocity.x = -2000.0f);
+                    
                 }
-
             }
         return i;
         }
+        if(prev_lower <= enemy_upper && object->velocity.y > 0 &&
+                upper >= enemy_upper && right >= enemy_left && left <= enemy_right)
+                {
+                object->position.y = enemy_upper - object->size.y;
+                object->velocity.y = 0.0f;
+                object->velocity.y -= 300.0f;
+                
+                enemies[i].object.dead = true;  
+                }
     }
     return -1;
 }
