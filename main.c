@@ -474,7 +474,7 @@ static int check_enemy_touching(Object *object)
         {  
             if(prev_lower <= enemy_upper)
             {
-                object->position.y = enemy_upper + object->size.y;
+                object->position.y = enemy_upper - object->size.y;
                 object->velocity.y = 0.0f;
                 object->velocity.y -= 300.0f;
                 
